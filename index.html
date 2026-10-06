@@ -496,7 +496,7 @@ async function playSearch(query, kind) {
   const types = kind ? [kind] : ["track", "artist", "playlist"];
   let item = null, type = null;
   for (const t of types) {
-    const data = await api(`/search?q=${encodeURIComponent(query)}&type=${t}&limit=1&market=from_token`);
+    const data = await api(`/search?q=${encodeURIComponent(query)}&type=${t}&limit=1&market=BR`);
     item = data[t + "s"]?.items?.filter(Boolean)[0];
     if (item) { type = t; break; }
   }
