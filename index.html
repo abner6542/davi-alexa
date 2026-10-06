@@ -11,8 +11,8 @@
   :root {
     --pink: #FF5D8F; --teal: #19C3B0; --purple: #7B4DFF; --orange: #FF9F1C; --yellow: #FFC93C; --blue: #3DA9FC;
     --ink: #2B1B5A;
-    --m: min(86vw, 50vh);
-    --m: min(86vw, 50dvh);
+    --m: min(84vw, 42vh);
+    --m: min(84vw, 42dvh);
     box-sizing: border-box;
   }
   *, *::before, *::after { box-sizing: inherit; -webkit-tap-highlight-color: transparent; }
@@ -144,6 +144,16 @@
   #disc::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* músicas favoritas: um toque = uma música */
+  .favs { display: flex; gap: 12px; padding: 4px 12px 8px; width: 100%; max-width: 560px; justify-content: center; z-index: 4; }
+  .favs button {
+    flex: 1; max-width: 170px; aspect-ratio: 1; max-height: 20dvh; border-radius: 28px; display: grid; place-items: center;
+    font-size: min(16vw, 9dvh, 5.4rem); line-height: 1; box-shadow: 0 8px 0 rgba(43,27,90,.2); transition: transform .1s;
+  }
+  .favs button:active { transform: translateY(5px) scale(.96); box-shadow: 0 3px 0 rgba(43,27,90,.2); }
+  .fav1 { background: #FFC93C; } .fav2 { background: #19C3B0; } .fav3 { background: #FF5D8F; }
+  body.logged-out .favs { display: none; }
+
   /* controles discretos, mas grandes */
   .controls { display: flex; gap: 14px; padding: 8px 0 18px; z-index: 4; }
   .controls button {
@@ -259,6 +269,12 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <button id="loginBtn">Entrar com Spotify</button>
 </main>
+
+<div class="favs" aria-label="Músicas favoritas">
+  <button class="fav1" data-q="Pula Pula Pipoquinha" aria-label="Pula pula pipoquinha">🍿</button>
+  <button class="fav2" data-q="Aram Sam Sam" aria-label="Aram sam sam">🙌</button>
+  <button class="fav3" data-q="Boi da Cara Preta" aria-label="Boi da cara preta">🐮</button>
+</div>
 
 <nav class="controls" aria-label="Controles de música">
   <button id="prevBtn" aria-label="Música anterior"><svg viewBox="0 0 24 24"><path fill="#7B4DFF" d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
@@ -762,6 +778,11 @@ $("pauseBtn").onclick = () => actions.pause().catch(e => setStatus(e.message, tr
 $("playBtn").onclick = () => actions.resume().catch(e => setStatus(e.message, true));
 $("nextBtn").onclick = () => actions.next().catch(e => setStatus(e.message, true));
 $("prevBtn").onclick = () => actions.previous().catch(e => setStatus(e.message, true));
+document.querySelectorAll(".favs button").forEach(b => b.onclick = () => {
+  requestWakeLock();
+  showHeard(b.dataset.q, true);
+  runCommand(b.dataset.q);
+});
 $("typeForm").onsubmit = e => {
   e.preventDefault();
   const text = $("typeInput").value.trim();
