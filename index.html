@@ -480,7 +480,14 @@ function logout() {
 }
 
 /* ===================== SPOTIFY API ===================== */
-async function api(path, { method = "GET", body } = {}) {
+// Erros 502/503/504 do Spotify são passageiros: tenta de novo até 3 vezes.
+async function api(path, opts) {
+  for (let n = 0; ; n++) {
+    try { return await apiOnce(path, opts); }
+    catch (e) { if (!e.transient || n >= 2) throw e; await new Promise(r => setTimeout(r, 800 * (n + 1))); }
+  }
+}
+async function apiOnce(path, { method = "GET", body } = {}) {
   const res = await fetch("https://api.spotify.com/v1" + path, {
     method,
     headers: { Authorization: "Bearer " + await getToken(), ...(body ? { "Content-Type": "application/json" } : {}) },
@@ -491,6 +498,10 @@ async function api(path, { method = "GET", body } = {}) {
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* o Spotify às vezes responde texto puro */ }
   if (!res.ok) {
+    if (res.status >= 502 && res.status <= 504) {
+      const err = new Error("O Spotify está instável agora (erro " + res.status + "). Tente de novo em alguns instantes.");
+      err.transient = true; throw err;
+    }
     const reason = data?.error?.reason;
     const detail = data?.error?.message || (data ? "" : text.slice(0, 160));
     if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) {
