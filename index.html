@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFE9A8">
+<title>Hora da Música</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #FF5D8F; --teal: #19C3B0; --purple: #7B4DFF; --orange: #FF9F1C; --yellow: #FFC93C; --blue: #3DA9FC;
+    --ink: #2B1B5A;
+    --m: min(90vw, 56vh);
+    --m: min(90vw, 56dvh);
+    box-sizing: border-box;
+  }
+  *, *::before, *::after { box-sizing: inherit; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; background: #FFF3C4; }
+  body {
+    margin: 0; min-height: 100%; height: 100dvh; overflow: hidden;
+    font-family: "Fredoka", "Nunito", "Arial Rounded MT Bold", system-ui, sans-serif;
+    color: var(--ink);
+    display: flex; flex-direction: column; align-items: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    touch-action: manipulation; overscroll-behavior: none;
+  }
+  button { font: inherit; color: inherit; border: none; background: none; padding: 0; cursor: pointer; }
+
+  /* ---------- Fundo de festa ---------- */
+  .bg {
+    position: fixed; inset: 0; z-index: -2;
+    background: linear-gradient(120deg, #FFE9A8, #FFC4DE, #BDEBFF, #D6C8FF, #FFE9A8);
+    background-size: 300% 300%; animation: bgShift 16s ease infinite;
+  }
+  body.is-listening .bg { animation-duration: 7s; }
+  body.party .bg { animation-duration: 1.6s; filter: saturate(1.4); }
+  @keyframes bgShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+  .decor { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .decor span {
+    position: absolute; left: var(--x); bottom: -12%; font-size: var(--s); color: var(--c); opacity: .5;
+    animation: floatUp var(--d) linear infinite; animation-delay: var(--delay);
+  }
+  @keyframes floatUp {
+    0% { transform: translate(0, 0) rotate(-12deg); }
+    50% { transform: translate(22px, -60vh) rotate(12deg); }
+    100% { transform: translate(-10px, -125vh) rotate(-8deg); }
+  }
+
+  /* ---------- Cena ---------- */
+  #stage { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; position: relative; }
+  #mascot {
+    position: relative; width: var(--m); height: var(--m); display: grid; place-items: center;
+    border-radius: 50%; outline: none;
+  }
+  #mascot:focus-visible { outline: 6px solid var(--purple); outline-offset: 6px; }
+  .mascot-svg { width: 100%; height: 100%; overflow: visible; animation: bob 2.6s ease-in-out infinite; position: relative; z-index: 2; }
+  @keyframes bob { 0%,100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-3%) scale(1.02, .98); } }
+
+  /* anéis que pulsam */
+  .rings i { position: absolute; inset: 6%; border-radius: 50%; border: 10px solid var(--pink); opacity: 0; z-index: 1; }
+  .rings i:nth-child(2) { border-color: var(--teal); }
+  .rings i:nth-child(3) { border-color: var(--purple); }
+  #stage[data-state="listening"] .rings i, #stage[data-state="armed"] .rings i, #stage[data-state="happy"] .rings i { animation: ping 1.8s ease-out infinite; }
+  .rings i:nth-child(2) { animation-delay: .6s !important; }
+  .rings i:nth-child(3) { animation-delay: 1.2s !important; }
+  #stage[data-state="armed"] .rings i { border-color: #FFB800; animation-duration: 1s; }
+  #stage.hearing .rings i { animation-duration: 1s; }
+  @keyframes ping { 0% { transform: scale(.85); opacity: .9; } 100% { transform: scale(1.3); opacity: 0; } }
+
+  /* rostinho */
+  .eyes-happy, .m-open, .m-wow, .m-sad { display: none; }
+  .eye { transform-box: fill-box; transform-origin: center; animation: blink 4.5s infinite; }
+  @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+  .arm { transform-box: fill-box; transform-origin: 50% 15%; }
+
+  #stage[data-state="listening"] .m-smile, #stage[data-state="happy"] .m-smile, #stage[data-state="armed"] .m-smile, #stage[data-state="oops"] .m-smile { display: none; }
+  #stage[data-state="listening"] .m-open, #stage[data-state="happy"] .m-open { display: block; }
+  #stage[data-state="armed"] .m-wow { display: block; }
+  #stage[data-state="oops"] .m-sad { display: block; }
+  #stage[data-state="happy"] .eyes-open { display: none; }
+  #stage[data-state="happy"] .eyes-happy { display: block; }
+  #stage[data-state="listening"] .m-open { transform-box: fill-box; transform-origin: 50% 0; animation: talk .5s ease-in-out infinite; }
+  @keyframes talk { 50% { transform: scaleY(.7); } }
+
+  #stage[data-state="listening"] .mascot-svg { animation: wiggle .8s ease-in-out infinite; }
+  #stage[data-state="listening"].hearing .mascot-svg, #stage[data-state="armed"] .mascot-svg { animation: hop .5s ease-in-out infinite; }
+  #stage[data-state="thinking"] .mascot-svg { animation: wiggle 1.2s ease-in-out infinite; }
+  #stage[data-state="happy"] .mascot-svg { animation: dance .6s ease-in-out infinite; }
+  #stage[data-state="oops"] .mascot-svg { animation: shake .5s ease-in-out 2; }
+  @keyframes wiggle { 0%,100% { transform: rotate(-4deg) scale(1.02); } 50% { transform: rotate(4deg) scale(1.04); } }
+  @keyframes hop { 0%,100% { transform: translateY(0) scale(1.03, .97); } 50% { transform: translateY(-7%) scale(.98, 1.04); } }
+  @keyframes dance { 0%,100% { transform: translateY(0) rotate(-9deg); } 50% { transform: translateY(-10%) rotate(9deg) scale(1.05); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
+  #stage[data-state="listening"] .armL, #stage[data-state="happy"] .armL, #stage[data-state="armed"] .armL { animation: waveL .5s ease-in-out infinite; }
+  #stage[data-state="listening"] .armR, #stage[data-state="happy"] .armR, #stage[data-state="armed"] .armR { animation: waveR .5s ease-in-out infinite; }
+  @keyframes waveL { 0%,100% { transform: rotate(12deg); } 50% { transform: rotate(-30deg); } }
+  @keyframes waveR { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(30deg); } }
+
+  /* balão do microfone: convida a tocar */
+  .badge {
+    position: absolute; right: 2%; top: 2%; width: 24%; aspect-ratio: 1; border-radius: 50%; z-index: 3;
+    background: #fff; box-shadow: 0 6px 0 rgba(43,27,90,.15); display: grid; place-items: center;
+    font-size: calc(var(--m) * .13); animation: badge 1.1s ease-in-out infinite;
+  }
+  @keyframes badge { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+  #stage[data-state="listening"] .badge, #stage[data-state="happy"] .badge, #stage[data-state="armed"] .badge, #stage[data-state="thinking"] .badge { display: none; }
+
+  /* aviso (para o adulto) */
+  #toast {
+    position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%); max-width: 92%;
+    background: #fff; color: var(--ink); border: 4px solid var(--pink); border-radius: 24px;
+    padding: 10px 18px; font-size: 1.25rem; font-weight: 600; text-align: center; display: none; z-index: 5;
+  }
+  #toast.show { display: block; }
+
+  /* login (só aparece enquanto ninguém entrou) */
+  #loginBtn {
+    display: none; margin-top: 12px; padding: 16px 26px; border-radius: 999px; background: var(--ink); color: #fff;
+    font-size: 1.2rem; font-weight: 700;
+  }
+  body.logged-out #loginBtn { display: block; }
+  body.logged-out #mascot { pointer-events: none; }
+  body.logged-out .badge, body.logged-out .controls, body.logged-out #disc { display: none !important; }
+
+  /* disco girando = música tocando */
+  #disc {
+    position: fixed; top: calc(env(safe-area-inset-top) + 14px); left: 14px; width: 78px; height: 78px; border-radius: 50%;
+    border: 6px solid #fff; box-shadow: 0 6px 16px rgba(43,27,90,.25); background: var(--purple) center/cover; overflow: hidden;
+    display: none; animation: spin 5s linear infinite; z-index: 4;
+  }
+  #disc.show { display: block; }
+  #disc.paused { animation-play-state: paused; }
+  #disc img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #disc::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* controles discretos, mas grandes */
+  .controls { display: flex; gap: 14px; padding: 8px 0 18px; z-index: 4; }
+  .controls button {
+    width: 68px; height: 68px; border-radius: 50%; background: rgba(255,255,255,.65); display: grid; place-items: center;
+    box-shadow: 0 5px 0 rgba(43,27,90,.12); transition: transform .1s;
+  }
+  .controls button:active { transform: scale(.92); }
+  .controls svg { width: 34px; height: 34px; }
+
+  /* canto do adulto: segurar 1,5 s */
+  #adminCorner {
+    position: fixed; top: env(safe-area-inset-top); right: 0; width: 76px; height: 76px; display: grid; place-items: center; z-index: 6; opacity: .3;
+  }
+  #adminCorner svg { width: 44px; height: 44px; }
+  #adminCorner .prog { stroke-dasharray: 126; stroke-dashoffset: 126; }
+  #adminCorner.pressing { opacity: .8; }
+  #adminCorner.pressing .prog { animation: fill 1.5s linear forwards; }
+  @keyframes fill { to { stroke-dashoffset: 0; } }
+
+  /* efeitos de comemoração */
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+  .burst { position: absolute; font-size: var(--fs); color: var(--c); transform: translate(-50%, -50%); animation: burst 1.9s ease-out forwards; text-shadow: 0 3px 0 rgba(43,27,90,.12); }
+  @keyframes burst { 0% { transform: translate(-50%,-50%) scale(.3); opacity: 1; } 100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(220deg); opacity: 0; } }
+  .rise { position: absolute; bottom: -10%; font-size: var(--fs); color: var(--c); animation: rise 3s ease-out forwards; }
+  @keyframes rise { 0% { transform: translateY(0) rotate(-10deg); opacity: 1; } 100% { transform: translateY(-115vh) rotate(25deg); opacity: .2; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bg, .decor span { animation: none; }
+    .decor { display: none; }
+  }
+
+  /* ---------- Painel do adulto ---------- */
+  #panel { position: fixed; inset: 0; z-index: 20; background: rgba(43,27,90,.55); display: grid; place-items: center; padding: 16px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #panel[hidden] { display: none; }
+  .card { background: #fff; border-radius: 22px; padding: 20px; width: min(100%, 460px); max-height: 92dvh; overflow: auto; display: flex; flex-direction: column; gap: 14px; -webkit-user-select: text; user-select: text; }
+  .card h2 { margin: 0; font-size: 1.2rem; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .small { font-size: .85rem; color: #55607a; }
+  .small.error { color: #c0262d; }
+  .card select, .card input[type=text] { flex: 1; min-width: 0; padding: 12px; border-radius: 10px; border: 1px solid #c5cbe0; font: inherit; font-size: 16px; }
+  .abtn { padding: 12px 16px; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 600; }
+  .abtn.ghost { background: #eceefa; color: var(--ink); }
+  body.logged-out .needs-login { display: none; }
+  body.mode-tap .hf-only { display: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #aab; display: inline-block; }
+  .dot.on { background: #28b765; }
+</style>
+</head>
+<body class="logged-out">
+
+<div class="bg"></div>
+<div class="decor" aria-hidden="true">
+  <span style="--x:5%;--d:11s;--delay:-3s;--s:2.4rem;--c:#FF5D8F">♪</span>
+  <span style="--x:18%;--d:14s;--delay:-9s;--s:3rem;--c:#19C3B0">♫</span>
+  <span style="--x:31%;--d:10s;--delay:-1s;--s:2rem;--c:#FF9F1C">★</span>
+  <span style="--x:45%;--d:15s;--delay:-6s;--s:2.8rem;--c:#7B4DFF">♬</span>
+  <span style="--x:58%;--d:12s;--delay:-11s;--s:2.2rem;--c:#3DA9FC">♪</span>
+  <span style="--x:70%;--d:13s;--delay:-4s;--s:3rem;--c:#FF5D8F">★</span>
+  <span style="--x:82%;--d:10s;--delay:-7s;--s:2.6rem;--c:#19C3B0">♫</span>
+  <span style="--x:92%;--d:16s;--delay:-2s;--s:2.2rem;--c:#FF9F1C">♬</span>
+</div>
+<div id="fx" aria-hidden="true"></div>
+
+<button id="adminCorner" aria-label="Área do adulto: segure o dedo por 2 segundos">
+  <svg viewBox="0 0 48 48" aria-hidden="true">
+    <circle cx="24" cy="24" r="20" fill="none" stroke="#2B1B5A" stroke-opacity=".25" stroke-width="3"/>
+    <circle class="prog" cx="24" cy="24" r="20" fill="none" stroke="#7B4DFF" stroke-width="4" stroke-linecap="round" transform="rotate(-90 24 24)" stroke-dasharray="126" />
+    <circle cx="24" cy="24" r="6" fill="#2B1B5A"/>
+  </svg>
+</button>
+
+<div id="disc" aria-hidden="true"><img id="nowImg" alt=""></div>
+
+<main id="stage" data-state="idle">
+  <button id="mascot" aria-label="Mascote da música">
+    <div class="rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <svg class="mascot-svg" viewBox="0 0 200 210" aria-hidden="true">
+      <defs>
+        <radialGradient id="gBody" cx="38%" cy="28%" r="85%">
+          <stop offset="0" stop-color="#FFF07A"/><stop offset=".55" stop-color="#FFC93C"/><stop offset="1" stop-color="#FF9F1C"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="100" cy="200" rx="60" ry="8" fill="#2B1B5A" opacity=".13"/>
+      <ellipse cx="70" cy="188" rx="24" ry="12" fill="#FF5D8F"/>
+      <ellipse cx="130" cy="188" rx="24" ry="12" fill="#FF5D8F"/>
+      <g class="arm armL"><ellipse cx="18" cy="130" rx="13" ry="26" fill="#FFB02E" transform="rotate(20 18 130)"/></g>
+      <g class="arm armR"><ellipse cx="182" cy="130" rx="13" ry="26" fill="#FFB02E" transform="rotate(-20 182 130)"/></g>
+      <circle cx="100" cy="112" r="82" fill="url(#gBody)"/>
+      <!-- fones de ouvido -->
+      <path d="M28 98 C28 0 172 0 172 98" fill="none" stroke="#19C3B0" stroke-width="12" stroke-linecap="round"/>
+      <rect x="12" y="84" width="28" height="50" rx="14" fill="#7B4DFF"/>
+      <rect x="160" y="84" width="28" height="50" rx="14" fill="#7B4DFF"/>
+      <!-- bochechas -->
+      <circle cx="56" cy="132" r="13" fill="#FF5D8F" opacity=".5"/>
+      <circle cx="144" cy="132" r="13" fill="#FF5D8F" opacity=".5"/>
+      <!-- olhos -->
+      <g class="eyes-open">
+        <g class="eye"><ellipse cx="76" cy="102" rx="14" ry="17" fill="#fff"/><circle cx="78" cy="105" r="9" fill="#2B1B5A"/><circle cx="81" cy="101" r="3.5" fill="#fff"/></g>
+        <g class="eye"><ellipse cx="124" cy="102" rx="14" ry="17" fill="#fff"/><circle cx="122" cy="105" r="9" fill="#2B1B5A"/><circle cx="125" cy="101" r="3.5" fill="#fff"/></g>
+      </g>
+      <g class="eyes-happy" fill="none" stroke="#2B1B5A" stroke-width="7" stroke-linecap="round">
+        <path d="M60 108 Q76 88 92 108"/><path d="M108 108 Q124 88 140 108"/>
+      </g>
+      <!-- bocas -->
+      <path class="m-smile" d="M72 140 Q100 170 128 140" fill="none" stroke="#2B1B5A" stroke-width="7" stroke-linecap="round"/>
+      <g class="m-open"><path d="M70 136 Q100 196 130 136 Z" fill="#7A1F3D"/><path d="M85 164 Q100 152 115 164 Q100 180 85 164 Z" fill="#FF7A9C"/></g>
+      <ellipse class="m-wow" cx="100" cy="152" rx="13" ry="16" fill="#7A1F3D"/>
+      <path class="m-sad" d="M76 160 Q100 138 124 160" fill="none" stroke="#2B1B5A" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    <div class="badge" aria-hidden="true">🎤</div>
+  </button>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <button id="loginBtn">Entrar com Spotify</button>
+</main>
+
+<nav class="controls" aria-label="Controles de música">
+  <button id="prevBtn" aria-label="Música anterior"><svg viewBox="0 0 24 24"><path fill="#7B4DFF" d="M5 5h3v14H5zM20 5v14L9 12z"/></svg></button>
+  <button id="pauseBtn" aria-label="Pausar"><svg viewBox="0 0 24 24"><path fill="#FF5D8F" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+  <button id="playBtn" aria-label="Continuar"><svg viewBox="0 0 24 24"><path fill="#19C3B0" d="M7 4v16l13-8z"/></svg></button>
+  <button id="nextBtn" aria-label="Próxima música"><svg viewBox="0 0 24 24"><path fill="#FF9F1C" d="M16 5h3v14h-3zM4 5v14l11-7z"/></svg></button>
+</nav>
+
+<!-- Painel técnico: só abre com toque longo no canto -->
+<div id="panel" hidden>
+  <div class="card">
+    <h2>Área do adulto</h2>
+    <div class="small"><span class="dot" id="lockDot"></span> <span id="lockText">Tela normal</span> · <span id="modeText"></span></div>
+    <div class="small" id="status"></div>
+    <div class="small" id="heard"></div>
+    <div class="small needs-login" id="nowInfo"></div>
+
+    <div class="needs-login">
+      <div class="small">Tocar em</div>
+      <div class="row">
+        <select id="deviceSelect"><option value="">Nenhum dispositivo encontrado</option></select>
+        <button class="abtn ghost" id="refreshDevices" type="button">Atualizar</button>
+      </div>
+    </div>
+
+    <form id="typeForm" autocomplete="off" class="row needs-login">
+      <input type="text" id="typeInput" placeholder="Digitar: Alexa, toca Evidências">
+      <button class="abtn" type="submit">Tocar</button>
+    </form>
+
+    <div class="row hf-only needs-login">
+      <button class="abtn ghost" id="micToggle" type="button">Ligar microfone</button>
+    </div>
+
+    <div class="row">
+      <button class="abtn ghost" id="logoutBtn" type="button">Sair do Spotify</button>
+      <button class="abtn" id="closePanel" type="button">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== CONFIGURAÇÃO ===================== */
+const CLIENT_ID = "7ee711b29b6e4b1590bcb542b3876a64";
+// O Redirect URI é o próprio endereço desta página.
+// Cadastre exatamente este endereço no painel do Spotify.
+const REDIRECT_URI = location.origin + location.pathname;
+const SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
+const WAKE_WORDS = ["alexa", "alexia", "aleksa", "alexsa", "alessa", "alex", "lexa", "elexa", "aleca", "aleka", "alexxa", "alecsa", "alecxa", "aleixa", "alesa"];
+
+/* ===================== DETECÇÃO DE DISPOSITIVO ===================== */
+// iPhone/iPad/iPod; iPadOS moderno se apresenta como "Macintosh" mas tem tela de toque.
+function detectIOS() {
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  if (navigator.userAgentData?.platform === "iOS") return true;
+  if ((navigator.platform === "MacIntel" || /Macintosh/.test(ua)) && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+// ?modo=toque ou ?modo=livre força um modo (útil para testar)
+const forced = new URLSearchParams(location.search).get("modo");
+const TAP_MODE = forced === "toque" ? true : forced === "livre" ? false : detectIOS();
+document.body.classList.add(TAP_MODE ? "mode-tap" : "mode-free");
+
+/* ===================== UTILIDADES ===================== */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+const normalize = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[.,!?;:]/g, "").replace(/\s+/g, " ").trim();
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/* ===================== ESTADO VISUAL DO MASCOTE ===================== */
+const stage = $("stage");
+let listening = false, armedUntil = 0, tempUntil = 0, isPlaying = false;
+
+function refresh() {
+  if (Date.now() >= tempUntil) {
+    stage.dataset.state = Date.now() < armedUntil ? "armed" : listening ? "listening" : "idle";
+  }
+  document.body.classList.toggle("is-listening", listening);
+}
+function flash(state, ms) {
+  stage.dataset.state = state;
+  tempUntil = Date.now() + ms;
+  setTimeout(refresh, ms + 30);
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 7000);
+}
+// Mensagens normais ficam só no painel do adulto; erros também aparecem na tela e o mascote fica confuso.
+function setStatus(msg, isError = false) {
+  $("status").textContent = msg;
+  $("status").classList.toggle("error", isError);
+  if (isError) { toast(msg); flash("oops", 2500); }
+}
+function setPlaying(on) {
+  isPlaying = on;
+  $("disc").classList.toggle("paused", !on);
+}
+
+function celebrate() {
+  const fx = $("fx");
+  const r = $("mascot").getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const chars = ["★", "♪", "♫", "♬", "✦", "♥"];
+  const colors = ["#FF5D8F", "#19C3B0", "#7B4DFF", "#FF9F1C", "#3DA9FC", "#FFC93C"];
+  for (let i = 0; i < 22; i++) {
+    const s = document.createElement("span");
+    const a = Math.random() * Math.PI * 2, dist = r.width * (.35 + Math.random() * .45);
+    s.className = "burst"; s.textContent = pick(chars);
+    s.style.cssText = `left:${cx}px;top:${cy}px;--dx:${Math.cos(a) * dist}px;--dy:${Math.sin(a) * dist - r.height * .15}px;--c:${pick(colors)};--fs:${1.8 + Math.random() * 2.2}rem;animation-delay:${Math.random() * .25}s`;
+    fx.appendChild(s); setTimeout(() => s.remove(), 2400);
+  }
+  for (let i = 0; i < 12; i++) {
+    const s = document.createElement("span");
+    s.className = "rise"; s.textContent = pick(["♪", "♫", "♬", "★"]);
+    s.style.cssText = `left:${Math.random() * 92}%;--c:${pick(colors)};--fs:${2 + Math.random() * 2}rem;animation-delay:${Math.random() * 1.2}s`;
+    fx.appendChild(s); setTimeout(() => s.remove(), 4400);
+  }
+  document.body.classList.add("party");
+  setTimeout(() => document.body.classList.remove("party"), 3500);
+}
+function happy() { flash("happy", 3500); celebrate(); }
+
+/* ===================== LOGIN (PKCE) ===================== */
+function randomString(len) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const vals = crypto.getRandomValues(new Uint8Array(len));
+  return Array.from(vals, v => chars[v % chars.length]).join("");
+}
+async function sha256b64url(text) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function login() {
+  const verifier = randomString(64);
+  store.set("pkce_verifier", verifier);
+  const params = new URLSearchParams({
+    response_type: "code", client_id: CLIENT_ID, scope: SCOPES,
+    code_challenge_method: "S256", code_challenge: await sha256b64url(verifier),
+    redirect_uri: REDIRECT_URI
+  });
+  location.href = "https://accounts.spotify.com/authorize?" + params;
+}
+async function tokenRequest(body) {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(body)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error || "Falha no login");
+  store.set("access_token", data.access_token);
+  if (data.refresh_token) store.set("refresh_token", data.refresh_token);
+  store.set("expires_at", String(Date.now() + (data.expires_in - 60) * 1000));
+}
+async function handleRedirect() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  if (params.get("error")) setStatus("Login cancelado: " + params.get("error"), true);
+  if (!code) return;
+  await tokenRequest({
+    grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI,
+    client_id: CLIENT_ID, code_verifier: store.get("pkce_verifier") || ""
+  });
+  history.replaceState({}, "", REDIRECT_URI);
+}
+async function getToken() {
+  if (Date.now() > Number(store.get("expires_at") || 0)) {
+    const refresh = store.get("refresh_token");
+    if (!refresh) throw new Error("Sessão expirada. Entre de novo.");
+    await tokenRequest({ grant_type: "refresh_token", refresh_token: refresh, client_id: CLIENT_ID });
+  }
+  return store.get("access_token");
+}
+function logout() {
+  ["access_token", "refresh_token", "expires_at", "pkce_verifier", "device_id", "mic_on"].forEach(store.del);
+  location.reload();
+}
+
+/* ===================== SPOTIFY API ===================== */
+async function api(path, { method = "GET", body } = {}) {
+  const res = await fetch("https://api.spotify.com/v1" + path, {
+    method,
+    headers: { Authorization: "Bearer " + await getToken(), ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 204) return null;
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    const reason = data?.error?.reason;
+    if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) throw new Error("Abra o app do Spotify no celular, toque algo rapidinho e clique em Atualizar.");
+    if (res.status === 403) throw new Error("O Spotify recusou o comando. Confira se a conta é Premium.");
+    throw new Error(data?.error?.message || "Erro " + res.status);
+  }
+  return data;
+}
+
+async function loadDevices() {
+  try {
+    const { devices } = await api("/me/player/devices");
+    const sel = $("deviceSelect");
+    sel.innerHTML = "";
+    if (!devices.length) {
+      sel.innerHTML = '<option value="">Nenhum dispositivo — abra o app do Spotify</option>';
+      return;
+    }
+    const saved = store.get("device_id");
+    devices.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.textContent = `${d.name} (${d.type})${d.is_active ? " • ativo" : ""}`;
+      sel.appendChild(opt);
+    });
+    const pickDev = devices.find(d => d.id === saved) || devices.find(d => d.is_active) || devices.find(d => d.type === "Smartphone") || devices[0];
+    sel.value = pickDev.id;
+    store.set("device_id", pickDev.id);
+  } catch (e) { setStatus(e.message, true); }
+}
+const deviceQuery = () => { const id = $("deviceSelect").value; return id ? "?device_id=" + id : ""; };
+
+// Devolve true se achou e tocou; false se não achou nada.
+async function playSearch(query, kind) {
+  setStatus(`Procurando "${query}"…`);
+  const types = kind ? [kind] : ["track", "artist", "playlist"];
+  let item = null, type = null;
+  for (const t of types) {
+    const data = await api(`/search?q=${encodeURIComponent(query)}&type=${t}&limit=1&market=from_token`);
+    item = data[t + "s"]?.items?.filter(Boolean)[0];
+    if (item) { type = t; break; }
+  }
+  if (!item) return false;
+
+  if (type === "track") await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { uris: [item.uri] } });
+  else await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { context_uri: item.uri } });
+
+  const img = (item.album?.images || item.images || [])[0]?.url || "";
+  $("nowImg").src = img;
+  $("disc").classList.add("show");
+  $("nowInfo").textContent = "Tocando: " + item.name + " — " +
+    (type === "track" ? item.artists.map(a => a.name).join(", ") : type === "playlist" ? "Playlist" : "Artista");
+  setPlaying(true);
+  setStatus("Tocando agora.");
+  happy();
+  return true;
+}
+
+const actions = {
+  pause: () => api("/me/player/pause" + deviceQuery(), { method: "PUT" }).then(() => { setPlaying(false); setStatus("Pausado."); }),
+  resume: () => api("/me/player/play" + deviceQuery(), { method: "PUT" }).then(() => { setPlaying(true); flash("happy", 1500); setStatus("Continuando."); }),
+  next: () => api("/me/player/next" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Próxima música."); }),
+  previous: () => api("/me/player/previous" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Música anterior."); })
+};
+
+/* ===================== INTERPRETAR COMANDO ===================== */
+const POLITE = "( a musica| musica| a cancao| por favor)*";
+const CONTROLS = [
+  [new RegExp("^(pausa|pause|pausar|pare|parar|para|silencio)" + POLITE + "$"), "pause"],
+  [new RegExp("^(continua|continuar|retoma|despausa|play)" + POLITE + "$"), "resume"],
+  [new RegExp("^(proxima|pula|pular|avanca|passa|passar)" + POLITE + "$"), "next"],
+  [new RegExp("^(anterior|volta|voltar|volta a|musica anterior)" + POLITE + "$"), "previous"]
+];
+function controlFor(cmd) { const c = CONTROLS.find(([re]) => re.test(cmd)); return c && c[1]; }
+
+function parseQuery(cmd) {
+  cmd = cmd.replace(/\s+por favor$/, "");
+  cmd = cmd.replace(/^(toca|toka|tocar|toque|coloca|colocar|coloque|bota|botar|bote|poe|por|ponha|reproduz|reproduzir|quero ouvir|quero escutar|escutar)\s+/, "");
+  cmd = cmd.replace(/^(a |o |aquela |aquele )?(musica|cancao)( do| da| de)?\s+/, "");
+  let kind = null;
+  const pl = cmd.match(/^(a |uma )?playlist\s+(.+)/);
+  const ar = cmd.match(/^(o |a )?(artista|banda|cantor|cantora)\s+(.+)/) || cmd.match(/^(musicas|sucessos) (do|da|de)\s+(.+)/);
+  if (pl) { kind = "playlist"; cmd = pl[2]; }
+  else if (ar) { kind = "artist"; cmd = ar[3]; }
+  return { query: cmd.trim(), kind };
+}
+
+// Aceita uma frase ou várias alternativas do reconhecedor (tenta uma por uma até achar).
+async function runCommand(input) {
+  const list = (Array.isArray(input) ? input : [input]).map(normalize).filter(Boolean);
+  if (!list.length) return;
+  try {
+    for (const c of list) { const k = controlFor(c); if (k) return await actions[k](); }
+    flash("thinking", 15000);
+    for (const c of list) {
+      const { query, kind } = parseQuery(c);
+      if (query && await playSearch(query, kind)) return;
+    }
+    setStatus(`Não achei "${parseQuery(list[0]).query || list[0]}" no Spotify.`, true);
+  } catch (e) { setStatus(e.message, true); }
+}
+
+/* ===================== VOZ ===================== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec;
+
+// Tolerante a pronúncia de criança: lista de variações + distância de edição pequena
+function isWake(w, pos) {
+  if (WAKE_WORDS.includes(w)) return true;
+  return pos < 3 && w.length >= 4 && w.length <= 7 && lev(w, "alexa") <= 2;
+}
+function findWake(words) { return words.findIndex((w, i) => isWake(w, i)); }
+
+function setArmed(on) {
+  armedUntil = on ? Date.now() + 10000 : 0;
+  refresh();
+  if (on) setTimeout(refresh, 10100);
+}
+
+/* ---- Modo mãos-livres (Android / desktop) ---- */
+function handleSpeech(rawAlts) {
+  const alts = rawAlts.map(normalize).filter(Boolean);
+  if (!alts.length) return;
+  $("heard").textContent = `Ouvi: "${alts[0]}"`;
+
+  const afters = []; let wakeSeen = false;
+  for (const a of alts) {
+    const words = a.split(" "), idx = findWake(words);
+    if (idx >= 0) { wakeSeen = true; const rest = words.slice(idx + 1).join(" "); if (rest) afters.push(rest); }
+  }
+  if (wakeSeen) {
+    if (afters.length) { setArmed(false); runCommand(afters); }
+    else setArmed(true);
+  } else if (Date.now() < armedUntil) {
+    setArmed(false); runCommand(alts);
+  }
+}
+
+let restartDelay = 250;
+function startListening() {
+  if (!SR) { setStatus("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", true); return; }
+  if (listening) return;
+  rec = new SR();
+  rec.lang = "pt-BR";
+  rec.continuous = true;
+  rec.interimResults = false;
+  rec.maxAlternatives = 5;
+  rec.onresult = e => {
+    restartDelay = 250;
+    const r = e.results[e.results.length - 1];
+    if (r.isFinal) handleSpeech(Array.from(r, a => a.transcript));
+  };
+  rec.onspeechstart = () => stage.classList.add("hearing");
+  rec.onspeechend = () => stage.classList.remove("hearing");
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      listening = false; store.del("mic_on");
+      setStatus("Permita o uso do microfone para esta página.", true);
+      refresh(); updateMicBtn();
+    } else if (e.error === "network") restartDelay = 3000;
+  };
+  // O Chrome encerra o reconhecimento sozinho depois de um tempo: reinicia automaticamente
+  rec.onend = () => {
+    stage.classList.remove("hearing");
+    if (listening) setTimeout(() => { try { rec.start(); } catch {} }, restartDelay);
+  };
+  listening = true;
+  try { rec.start(); } catch {}
+  store.set("mic_on", "1");
+  refresh(); updateMicBtn();
+  setStatus('Escutando. Diga "Alexa, toca…" e o nome da música.');
+  requestWakeLock();
+}
+function stopListening() {
+  listening = false;
+  store.del("mic_on");
+  try { rec?.stop(); } catch {}
+  setArmed(false); refresh(); updateMicBtn();
+  setStatus("Microfone desligado.");
+}
+function updateMicBtn() { $("micToggle").textContent = listening ? "Desligar microfone" : "Ligar microfone"; }
+
+/* ---- Modo "toque para falar" (iPhone / iPad) ---- */
+// O iOS só libera o microfone depois de um toque completo, e derruba o microfone contínuo.
+// Então: um toque no mascote = uma música. Ele escuta até a frase acabar.
+let tapStartedAt = 0, tapTimer, tapAlts = [], tapHandled = false;
+
+function stripWake(alt) {
+  const words = normalize(alt).split(" "), idx = findWake(words);
+  return idx >= 0 && idx <= 1 ? words.slice(idx + 1).join(" ") : words.join(" ");
+}
+function tapFinish() {
+  if (tapHandled || !tapAlts.length) return;
+  tapHandled = true;
+  $("heard").textContent = `Ouvi: "${normalize(tapAlts[0])}"`;
+  const cmds = tapAlts.map(stripWake).filter(Boolean);
+  if (cmds.length) runCommand(cmds); else flash("oops", 1500);
+}
+function tapStart() {
+  if (!SR) { setStatus("Este navegador não tem reconhecimento de voz. Ative o Ditado nos Ajustes do iPhone.", true); return; }
+  requestWakeLock();
+  rec = new SR();
+  rec.lang = "pt-BR";
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.maxAlternatives = 5;
+  tapAlts = []; tapHandled = false;
+  rec.onresult = e => {
+    const r = e.results[e.results.length - 1];
+    tapAlts = Array.from(r, a => a.transcript);
+    if (r.isFinal) tapFinish();
+  };
+  rec.onspeechstart = () => stage.classList.add("hearing");
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed")
+      setStatus("Permita o microfone e o Ditado para esta página (Ajustes do iPhone).", true);
+  };
+  rec.onend = () => {
+    listening = false; clearTimeout(tapTimer);
+    stage.classList.remove("hearing");
+    refresh();
+    if (!tapHandled && !tapAlts.length) flash("oops", 1200);   // não ouviu nada
+    else tapFinish();
+  };
+  try { rec.start(); listening = true; tapStartedAt = Date.now(); } catch { listening = false; }
+  tapTimer = setTimeout(() => { try { rec.stop(); } catch {} }, 10000);   // limite de segurança
+  refresh();
+}
+function tapStop() { try { rec.stop(); } catch {} }
+
+/* ===================== TELA SEMPRE LIGADA ===================== */
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if (!("wakeLock" in navigator)) { $("lockText").textContent = "Trava de tela indisponível"; return; }
+    wakeLock = await navigator.wakeLock.request("screen");
+    $("lockDot").classList.add("on");
+    $("lockText").textContent = "Tela sempre ligada";
+    wakeLock.addEventListener("release", () => {
+      $("lockDot").classList.remove("on");
+      $("lockText").textContent = "Tela normal";
+    });
+  } catch { $("lockText").textContent = "Trava de tela recusada"; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (listening || TAP_MODE) requestWakeLock();
+    if (document.body.classList.contains("logged-out") === false) loadDevices();
+  }
+});
+
+/* ===================== PAINEL DO ADULTO (toque longo no canto) ===================== */
+const corner = $("adminCorner");
+let holdTimer;
+function holdStart(e) {
+  e.preventDefault();
+  corner.classList.add("pressing");
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => { corner.classList.remove("pressing"); $("panel").hidden = false; }, 1500);
+}
+function holdEnd() { clearTimeout(holdTimer); corner.classList.remove("pressing"); }
+corner.addEventListener("pointerdown", holdStart);
+["pointerup", "pointercancel", "pointerleave"].forEach(t => corner.addEventListener(t, holdEnd));
+corner.addEventListener("contextmenu", e => e.preventDefault());
+$("closePanel").onclick = () => { $("panel").hidden = true; };
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+/* ===================== INÍCIO ===================== */
+$("modeText").textContent = TAP_MODE ? "Modo: toque para falar (iPhone/iPad)" : "Modo: mãos-livres";
+$("loginBtn").onclick = login;
+$("logoutBtn").onclick = logout;
+$("micToggle").onclick = () => listening ? stopListening() : startListening();
+$("refreshDevices").onclick = loadDevices;
+$("deviceSelect").onchange = e => store.set("device_id", e.target.value);
+$("pauseBtn").onclick = () => actions.pause().catch(e => setStatus(e.message, true));
+$("playBtn").onclick = () => actions.resume().catch(e => setStatus(e.message, true));
+$("nextBtn").onclick = () => actions.next().catch(e => setStatus(e.message, true));
+$("prevBtn").onclick = () => actions.previous().catch(e => setStatus(e.message, true));
+$("typeForm").onsubmit = e => {
+  e.preventDefault();
+  const text = $("typeInput").value.trim();
+  if (!text) return;
+  const norm = normalize(text), words = norm.split(" ");
+  runCommand(WAKE_WORDS.includes(words[0]) ? words.slice(1).join(" ") : norm);
+  $("typeInput").value = "";
+  $("panel").hidden = true;
+};
+
+$("mascot").addEventListener("click", () => {
+  requestWakeLock();
+  if (TAP_MODE) {
+    if (listening) { if (Date.now() - tapStartedAt > 2000) tapStop(); else flash("happy", 600); }  // ignora toque duplo da criança
+    else tapStart();
+  } else {
+    if (!listening) startListening(); else flash("happy", 900);   // criança não consegue desligar o microfone sem querer
+  }
+});
+
+(async () => {
+  try {
+    await handleRedirect();
+    if (store.get("access_token")) {
+      document.body.classList.remove("logged-out");
+      await loadDevices();
+      // Mãos-livres: se o microfone já foi liberado antes, religa sozinho
+      if (!TAP_MODE && SR && store.get("mic_on") === "1") {
+        try {
+          const p = await navigator.permissions?.query({ name: "microphone" });
+          if (p?.state === "granted") startListening();
+        } catch {}
+      }
+    }
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+  updateMicBtn();
+})();
+</script>
+</body>
+</html>
