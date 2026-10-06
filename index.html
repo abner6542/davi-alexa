@@ -271,8 +271,8 @@
 </main>
 
 <div class="favs" aria-label="Músicas favoritas">
-  <button class="fav1" data-q="Pula Pula Pipoquinha" aria-label="Pula pula pipoquinha">🍿</button>
-  <button class="fav2" data-q="Aram Sam Sam" aria-label="Aram sam sam">🙌</button>
+  <button class="fav1" data-q="Pula Pula Pipoquinha" data-id="1ynWIGEB0PTJpcwtTUXBJN" aria-label="Pula pula pipoquinha">🍿</button>
+  <button class="fav2" data-q="Aram Sam Sam" data-id="1NmQAgm8hpdINRSotKw68A" aria-label="Aram sam sam">🙌</button>
   <button class="fav3" data-q="Boi da Cara Preta" aria-label="Boi da cara preta">🐮</button>
 </div>
 
@@ -535,7 +535,12 @@ async function playSearch(query, kind) {
     if (item) { type = t; break; }
   }
   if (!item) return false;
+  await startItem(item, type);
+  return true;
+}
 
+// Toca um item já conhecido (faixa, artista ou playlist) e atualiza a tela.
+async function startItem(item, type) {
   if (type === "track") await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { uris: [item.uri] } });
   else await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { context_uri: item.uri } });
 
@@ -549,7 +554,12 @@ async function playSearch(query, kind) {
   setPlaying(true);
   setStatus("Tocando agora.");
   happy();
-  return true;
+}
+
+async function playTrackId(id) {
+  setStatus("Abrindo música…");
+  flash("thinking", 15000);
+  await startItem(await api("/tracks/" + id), "track");
 }
 
 const actions = {
@@ -781,7 +791,8 @@ $("prevBtn").onclick = () => actions.previous().catch(e => setStatus(e.message, 
 document.querySelectorAll(".favs button").forEach(b => b.onclick = () => {
   requestWakeLock();
   showHeard(b.dataset.q, true);
-  runCommand(b.dataset.q);
+  if (b.dataset.id) playTrackId(b.dataset.id).catch(e => setStatus(e.message, true));
+  else runCommand(b.dataset.q);
 });
 $("typeForm").onsubmit = e => {
   e.preventDefault();
