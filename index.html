@@ -507,7 +507,7 @@ async function apiOnce(path, { method = "GET", body } = {}) {
     const reason = data?.error?.reason;
     const detail = data?.error?.message || (data ? "" : text.slice(0, 160));
     if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) {
-      const err = new Error("O Spotify do celular dormiu. Abra o app do Spotify, deixe uma música tocar uns segundos e volte para esta página. [" + res.status + (reason ? " " + reason : "") + (data?.error?.message ? " " + data.error.message : "") + "]");
+      const err = new Error("O Spotify do celular dormiu. Abra o app do Spotify por um instante e volte para esta página.");
       err.noDevice = true; throw err;
     }
     if (res.status === 403) throw new Error("O Spotify recusou (403)" + (detail ? ": " + detail : "") + (reason ? " [" + reason + "]" : ""));
@@ -553,14 +553,8 @@ async function playOn(body) {
     const id = $("deviceSelect").value;
     if (!id) throw e;
     try { await api("/me/player", { method: "PUT", body: { device_ids: [id], play: false } }); } catch {}
-    // O app do iPhone pode levar alguns segundos para acordar: tenta algumas vezes
-    let last = e;
-    for (let i = 0; i < 3; i++) {
-      await new Promise(r => setTimeout(r, 1500));
-      try { return await put("?device_id=" + id); }
-      catch (e2) { if (!e2.noDevice) throw e2; last = e2; }
-    }
-    throw last;
+    await new Promise(r => setTimeout(r, 800));
+    return put("?device_id=" + id);
   }
 }
 // Sempre exige o celular: sem ele, falha em vez de tocar no que estiver ativo (a Echo).
