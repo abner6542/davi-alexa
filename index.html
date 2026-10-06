@@ -591,6 +591,13 @@ function parseQuery(cmd) {
   return { query: cmd.trim(), kind };
 }
 
+// Músicas favoritas: se a frase parecer uma delas, toca a faixa exata (mesmos IDs dos 3 botões).
+const FAVS = [
+  { id: "1ynWIGEB0PTJpcwtTUXBJN", re: /pipoq|pipoc|pula pula/ },
+  { id: "1NmQAgm8hpdINRSotKw68A", re: /(h?aram|arasam|aran)|aram ?sam|ara ?sam|rasam/ },
+  { id: "4JhdgPZcEU69ZuTNgyexFR", re: /boi da cara|cara preta|boi da/ }
+];
+
 // Aceita uma frase ou várias alternativas do reconhecedor (tenta uma por uma até achar).
 async function runCommand(input) {
   const list = (Array.isArray(input) ? input : [input]).map(normalize).filter(Boolean);
@@ -598,6 +605,10 @@ async function runCommand(input) {
   try {
     for (const c of list) { const k = controlFor(c); if (k) return await actions[k](); }
     flash("thinking", 15000);
+    for (const c of list) {
+      const fav = !parseQuery(c).kind && FAVS.find(f => f.re.test(parseQuery(c).query));
+      if (fav) return await playTrackId(fav.id);
+    }
     for (const c of list) {
       const { query, kind } = parseQuery(c);
       if (query && await playSearch(query, kind)) return;
