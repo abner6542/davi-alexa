@@ -493,7 +493,10 @@ async function api(path, { method = "GET", body } = {}) {
   if (!res.ok) {
     const reason = data?.error?.reason;
     const detail = data?.error?.message || (data ? "" : text.slice(0, 160));
-    if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) throw new Error("Abra o app do Spotify no celular, toque algo rapidinho e clique em Atualizar.");
+    if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) {
+      const err = new Error("O Spotify do celular dormiu. Abra o app do Spotify por um instante e volte para esta página.");
+      err.noDevice = true; throw err;
+    }
     if (res.status === 403) throw new Error("O Spotify recusou (403)" + (detail ? ": " + detail : "") + (reason ? " [" + reason + "]" : ""));
     if (res.status === 429) throw new Error("Spotify pediu para esperar um pouco. Tente de novo em instantes.");
     throw new Error(detail || "Erro " + res.status);
@@ -522,6 +525,21 @@ async function loadDevices() {
     store.set("device_id", pickDev.id);
   } catch (e) { setStatus(e.message, true); }
 }
+// Toca no dispositivo escolhido. Se o Spotify "dormiu", atualiza a lista, transfere a reprodução e tenta de novo.
+async function playOn(body) {
+  const put = q => api("/me/player/play" + q, { method: "PUT", body });
+  try { return await put(deviceQuery()); }
+  catch (e) {
+    if (!e.noDevice) throw e;
+    store.del("device_id");
+    await loadDevices();
+    const id = $("deviceSelect").value;
+    if (!id) throw e;
+    try { await api("/me/player", { method: "PUT", body: { device_ids: [id], play: false } }); } catch {}
+    await new Promise(r => setTimeout(r, 800));
+    return put("?device_id=" + id);
+  }
+}
 const deviceQuery = () => { const id = $("deviceSelect").value; return id ? "?device_id=" + id : ""; };
 
 // Devolve true se achou e tocou; false se não achou nada.
@@ -541,8 +559,7 @@ async function playSearch(query, kind) {
 
 // Toca um item já conhecido (faixa, artista ou playlist) e atualiza a tela.
 async function startItem(item, type) {
-  if (type === "track") await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { uris: [item.uri] } });
-  else await api("/me/player/play" + deviceQuery(), { method: "PUT", body: { context_uri: item.uri } });
+  await playOn(type === "track" ? { uris: [item.uri] } : { context_uri: item.uri });
 
   const img = (item.album?.images || item.images || [])[0]?.url || "";
   $("nowImg").src = img;
@@ -564,7 +581,7 @@ async function playTrackId(id) {
 
 const actions = {
   pause: () => api("/me/player/pause" + deviceQuery(), { method: "PUT" }).then(() => { setPlaying(false); setStatus("Pausado."); }),
-  resume: () => api("/me/player/play" + deviceQuery(), { method: "PUT" }).then(() => { setPlaying(true); flash("happy", 1500); setStatus("Continuando."); }),
+  resume: () => playOn().then(() => { setPlaying(true); flash("happy", 1500); setStatus("Continuando."); }),
   next: () => api("/me/player/next" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Próxima música."); }),
   previous: () => api("/me/player/previous" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Música anterior."); })
 };
