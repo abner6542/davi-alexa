@@ -517,14 +517,16 @@ async function apiOnce(path, { method = "GET", body } = {}) {
   return data;
 }
 
+let seenDevices = "";
 async function loadDevices() {
   try {
     const { devices: all } = await api("/me/player/devices");
-    const devices = all.filter(d => /smartphone|tablet/i.test(d.type));   // nunca a Echo/caixas
+    const devices = all.filter(d => /smartphone|tablet|unknown/i.test(d.type));   // nunca a Echo/caixas
+    seenDevices = all.length ? all.map(d => `${d.name} (${d.type})`).join(", ") : "nenhum";
     const sel = $("deviceSelect");
     sel.innerHTML = "";
     if (!devices.length) {
-      sel.innerHTML = '<option value="">Celular não encontrado — abra o app do Spotify</option>';
+      sel.innerHTML = '<option value="">Celular não encontrado — dispositivos vistos: ' + seenDevices + '</option>';
       store.del("device_id");
       return;
     }
@@ -559,7 +561,7 @@ async function playOn(body) {
 async function phoneQuery() {
   if (!$("deviceSelect").value) await loadDevices();
   const id = $("deviceSelect").value;
-  if (!id) { const err = new Error("Celular não encontrado no Spotify. Abra o app do Spotify no celular por um instante e volte para esta página."); err.noDevice = true; throw err; }
+  if (!id) { const err = new Error("Celular não encontrado no Spotify. Toque uma música no app do Spotify do celular por alguns segundos e volte aqui. Dispositivos que o Spotify vê agora: " + (seenDevices || "nenhum") + "."); err.noDevice = true; throw err; }
   return "?device_id=" + id;
 }
 
