@@ -521,7 +521,7 @@ let seenDevices = "";
 async function loadDevices() {
   try {
     const { devices: all } = await api("/me/player/devices");
-    const devices = all.filter(d => /smartphone|tablet|unknown/i.test(d.type));   // nunca a Echo/caixas
+    const devices = all.filter(d => !/speaker|cast|avr|tv|stb|dongle|console|automobile/i.test(d.type));   // nunca a Echo/caixas/TVs
     seenDevices = all.length ? all.map(d => `${d.name} (${d.type})`).join(", ") : "nenhum";
     const sel = $("deviceSelect");
     sel.innerHTML = "";
@@ -537,7 +537,7 @@ async function loadDevices() {
       opt.textContent = `${d.name} (${d.type})${d.is_active ? " • ativo" : ""}`;
       sel.appendChild(opt);
     });
-    const pickDev = devices.find(d => d.id === saved) || devices.find(d => d.is_active) || devices[0];
+    const pickDev = devices.find(d => d.id === saved) || devices.find(d => /smartphone/i.test(d.type)) || devices.find(d => /tablet/i.test(d.type)) || devices.find(d => d.is_active) || devices[0];
     sel.value = pickDev.id;
     store.set("device_id", pickDev.id);
   } catch (e) { setStatus(e.message, true); }
