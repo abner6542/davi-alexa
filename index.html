@@ -11,8 +11,8 @@
   :root {
     --pink: #FF5D8F; --teal: #19C3B0; --purple: #7B4DFF; --orange: #FF9F1C; --yellow: #FFC93C; --blue: #3DA9FC;
     --ink: #2B1B5A;
-    --m: min(90vw, 56vh);
-    --m: min(90vw, 56dvh);
+    --m: min(86vw, 50vh);
+    --m: min(86vw, 50dvh);
     box-sizing: border-box;
   }
   *, *::before, *::after { box-sizing: inherit; -webkit-tap-highlight-color: transparent; }
@@ -109,8 +109,15 @@
   #stage[data-state="listening"] .badge, #stage[data-state="happy"] .badge, #stage[data-state="armed"] .badge, #stage[data-state="thinking"] .badge { display: none; }
 
   /* aviso (para o adulto) */
+  #bubble { width: 94%; max-width: 560px; text-align: center; margin-top: 6px; display: none; z-index: 5; pointer-events: none; }
+  #bubble.show { display: block; }
+  #bubble div { background: #fff; border-radius: 22px; padding: 8px 16px; font-size: 1.3rem; font-weight: 600; margin: 4px auto 0; width: fit-content; max-width: 100%; box-shadow: 0 4px 0 rgba(43,27,90,.12); overflow-wrap: anywhere; }
+  #bubbleHeard { border: 3px solid var(--teal); }
+  #bubbleHeard.ignored { border-color: #bbb; color: #777; }
+  #bubbleNow { border: 3px solid var(--purple); }
+  #bubble div:empty { display: none; }
   #toast {
-    position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%); max-width: 92%;
+    position: absolute; top: 92px; left: 50%; transform: translateX(-50%); max-width: 92%;
     background: #fff; color: var(--ink); border: 4px solid var(--pink); border-radius: 24px;
     padding: 10px 18px; font-size: 1.25rem; font-weight: 600; text-align: center; display: none; z-index: 5;
   }
@@ -248,6 +255,7 @@
     </svg>
     <div class="badge" aria-hidden="true">🎤</div>
   </button>
+  <div id="bubble" aria-live="polite"><div id="bubbleHeard"></div><div id="bubbleNow"></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <button id="loginBtn">Entrar com Spotify</button>
 </main>
@@ -359,6 +367,16 @@ function setStatus(msg, isError = false) {
   $("status").textContent = msg;
   $("status").classList.toggle("error", isError);
   if (isError) { toast(msg); flash("oops", 2500); }
+}
+let heardTimer;
+function showHeard(text, final, ignored) {
+  const b = $("bubbleHeard");
+  b.textContent = text ? "🎤 " + text : "";
+  b.classList.toggle("ignored", !!ignored);
+  $("bubble").classList.add("show");
+  $("heard").textContent = text ? `Ouvi: "${text}"` : "";
+  clearTimeout(heardTimer);
+  if (final) heardTimer = setTimeout(() => { b.textContent = ""; }, 12000);
 }
 function setPlaying(on) {
   isPlaying = on;
@@ -508,8 +526,10 @@ async function playSearch(query, kind) {
   const img = (item.album?.images || item.images || [])[0]?.url || "";
   $("nowImg").src = img;
   $("disc").classList.add("show");
-  $("nowInfo").textContent = "Tocando: " + item.name + " — " +
-    (type === "track" ? item.artists.map(a => a.name).join(", ") : type === "playlist" ? "Playlist" : "Artista");
+  const info = item.name + " — " + (type === "track" ? item.artists.map(a => a.name).join(", ") : type === "playlist" ? "Playlist" : "Artista");
+  $("nowInfo").textContent = "Tocando: " + info;
+  $("bubbleNow").textContent = "♪ " + info;
+  $("bubble").classList.add("show");
   setPlaying(true);
   setStatus("Tocando agora.");
   happy();
@@ -581,18 +601,20 @@ function setArmed(on) {
 function handleSpeech(rawAlts) {
   const alts = rawAlts.map(normalize).filter(Boolean);
   if (!alts.length) return;
-  $("heard").textContent = `Ouvi: "${alts[0]}"`;
-
   const afters = []; let wakeSeen = false;
   for (const a of alts) {
     const words = a.split(" "), idx = findWake(words);
     if (idx >= 0) { wakeSeen = true; const rest = words.slice(idx + 1).join(" "); if (rest) afters.push(rest); }
   }
   if (wakeSeen) {
+    showHeard(alts[0], true);
     if (afters.length) { setArmed(false); runCommand(afters); }
-    else setArmed(true);
+    else { setArmed(true); $("bubbleHeard").textContent += " … pode falar!"; }
   } else if (Date.now() < armedUntil) {
+    showHeard(alts[0], true);
     setArmed(false); runCommand(alts);
+  } else {
+    showHeard(alts[0] + "  (sem “Alexa”: ignorei)", true, true);
   }
 }
 
@@ -603,12 +625,15 @@ function startListening() {
   rec = new SR();
   rec.lang = "pt-BR";
   rec.continuous = true;
-  rec.interimResults = false;
+  rec.interimResults = true;
   rec.maxAlternatives = 5;
   rec.onresult = e => {
     restartDelay = 250;
-    const r = e.results[e.results.length - 1];
-    if (r.isFinal) handleSpeech(Array.from(r, a => a.transcript));
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) handleSpeech(Array.from(r, a => a.transcript));
+      else showHeard(normalize(r[0].transcript), false);
+    }
   };
   rec.onspeechstart = () => stage.classList.add("hearing");
   rec.onspeechend = () => stage.classList.remove("hearing");
@@ -652,7 +677,7 @@ function stripWake(alt) {
 function tapFinish() {
   if (tapHandled || !tapAlts.length) return;
   tapHandled = true;
-  $("heard").textContent = `Ouvi: "${normalize(tapAlts[0])}"`;
+  showHeard(normalize(tapAlts[0]), true);
   const cmds = tapAlts.map(stripWake).filter(Boolean);
   if (cmds.length) runCommand(cmds); else flash("oops", 1500);
 }
@@ -668,6 +693,7 @@ function tapStart() {
   rec.onresult = e => {
     const r = e.results[e.results.length - 1];
     tapAlts = Array.from(r, a => a.transcript);
+    showHeard(normalize(tapAlts[0]), r.isFinal);
     if (r.isFinal) tapFinish();
   };
   rec.onspeechstart = () => stage.classList.add("hearing");
