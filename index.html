@@ -506,11 +506,13 @@ async function api(path, { method = "GET", body } = {}) {
 
 async function loadDevices() {
   try {
-    const { devices } = await api("/me/player/devices");
+    const { devices: all } = await api("/me/player/devices");
+    const devices = all.filter(d => /smartphone|tablet/i.test(d.type));   // nunca a Echo/caixas
     const sel = $("deviceSelect");
     sel.innerHTML = "";
     if (!devices.length) {
-      sel.innerHTML = '<option value="">Nenhum dispositivo — abra o app do Spotify</option>';
+      sel.innerHTML = '<option value="">Celular não encontrado — abra o app do Spotify</option>';
+      store.del("device_id");
       return;
     }
     const saved = store.get("device_id");
@@ -520,7 +522,7 @@ async function loadDevices() {
       opt.textContent = `${d.name} (${d.type})${d.is_active ? " • ativo" : ""}`;
       sel.appendChild(opt);
     });
-    const pickDev = devices.find(d => d.id === saved) || devices.find(d => d.is_active) || devices.find(d => d.type === "Smartphone") || devices[0];
+    const pickDev = devices.find(d => d.id === saved) || devices.find(d => d.is_active) || devices[0];
     sel.value = pickDev.id;
     store.set("device_id", pickDev.id);
   } catch (e) { setStatus(e.message, true); }
@@ -528,7 +530,7 @@ async function loadDevices() {
 // Toca no dispositivo escolhido. Se o Spotify "dormiu", atualiza a lista, transfere a reprodução e tenta de novo.
 async function playOn(body) {
   const put = q => api("/me/player/play" + q, { method: "PUT", body });
-  try { return await put(deviceQuery()); }
+  try { return await put(await phoneQuery()); }
   catch (e) {
     if (!e.noDevice) throw e;
     store.del("device_id");
@@ -540,7 +542,13 @@ async function playOn(body) {
     return put("?device_id=" + id);
   }
 }
-const deviceQuery = () => { const id = $("deviceSelect").value; return id ? "?device_id=" + id : ""; };
+// Sempre exige o celular: sem ele, falha em vez de tocar no que estiver ativo (a Echo).
+async function phoneQuery() {
+  if (!$("deviceSelect").value) await loadDevices();
+  const id = $("deviceSelect").value;
+  if (!id) { const err = new Error("Celular não encontrado no Spotify. Abra o app do Spotify no celular por um instante e volte para esta página."); err.noDevice = true; throw err; }
+  return "?device_id=" + id;
+}
 
 // Devolve true se achou e tocou; false se não achou nada.
 async function playSearch(query, kind) {
@@ -580,10 +588,10 @@ async function playTrackId(id) {
 }
 
 const actions = {
-  pause: () => api("/me/player/pause" + deviceQuery(), { method: "PUT" }).then(() => { setPlaying(false); setStatus("Pausado."); }),
+  pause: () => phoneQuery().then(q => api("/me/player/pause" + q, { method: "PUT" })).then(() => { setPlaying(false); setStatus("Pausado."); }),
   resume: () => playOn().then(() => { setPlaying(true); flash("happy", 1500); setStatus("Continuando."); }),
-  next: () => api("/me/player/next" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Próxima música."); }),
-  previous: () => api("/me/player/previous" + deviceQuery(), { method: "POST" }).then(() => { setPlaying(true); happy(); setStatus("Música anterior."); })
+  next: () => phoneQuery().then(q => api("/me/player/next" + q, { method: "POST" })).then(() => { setPlaying(true); happy(); setStatus("Próxima música."); }),
+  previous: () => phoneQuery().then(q => api("/me/player/previous" + q, { method: "POST" })).then(() => { setPlaying(true); happy(); setStatus("Música anterior."); })
 };
 
 /* ===================== INTERPRETAR COMANDO ===================== */
