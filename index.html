@@ -454,12 +454,15 @@ async function api(path, { method = "GET", body } = {}) {
   });
   if (res.status === 204) return null;
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* o Spotify às vezes responde texto puro */ }
   if (!res.ok) {
     const reason = data?.error?.reason;
+    const detail = data?.error?.message || (data ? "" : text.slice(0, 160));
     if (reason === "NO_ACTIVE_DEVICE" || res.status === 404) throw new Error("Abra o app do Spotify no celular, toque algo rapidinho e clique em Atualizar.");
-    if (res.status === 403) throw new Error("O Spotify recusou o comando. Confira se a conta é Premium.");
-    throw new Error(data?.error?.message || "Erro " + res.status);
+    if (res.status === 403) throw new Error("O Spotify recusou (403)" + (detail ? ": " + detail : "") + (reason ? " [" + reason + "]" : ""));
+    if (res.status === 429) throw new Error("Spotify pediu para esperar um pouco. Tente de novo em instantes.");
+    throw new Error(detail || "Erro " + res.status);
   }
   return data;
 }
